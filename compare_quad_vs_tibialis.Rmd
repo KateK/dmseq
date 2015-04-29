@@ -1,0 +1,192 @@
+---
+title: "Quad versus Tibialis"
+author: "Adam Struck"
+date: "February 25, 2015"
+output:
+  pdf_document:
+    highlight: tango
+    toc: yes
+    toc_depth: 3
+---
+
+```{r Configuration, echo=TRUE, warning=FALSE, message=FALSE, results='hide'}
+library(knitr)
+library(ggplot2)
+library(topGO)
+library(org.Hs.eg.db)
+library(dplyr)
+library(tidyr)
+library(data.table)
+library(foreach)
+library(stringr)
+library(Rgraphviz)
+
+opts_chunk$set(background='gray80', echo = TRUE, tidy=TRUE, 
+               warning = FALSE, cache=FALSE, comment='', dpi=72)
+```
+
+```{r Functions}
+find.dm.events <- function(DT) {
+    if("gene_symbol" %in% colnames(DT)){
+        DT %>%
+        filter(abs(delta_psi_mean) >= 0.05,
+               Control_n / max(Control_n, na.rm = TRUE)  >= 0.75,
+               DM1_n / max(DM1_n, na.rm = TRUE) >= 0.75,
+               DM1_n_sig / DM1_n >= 0.25) %>%
+        select(gene_symbol, event_name, isoforms, Control_psi_mean, Control_psi_sd, Control_n,
+                      DM1_psi_mean, DM1_psi_sd, DM1_n, delta_psi_mean, DM1_n_sig) %>%
+        arrange(desc(abs(delta_psi_mean)))
+    } else {
+        DT %>%
+        filter(abs(delta_psi_mean) >= 0.05,
+               Control_n / max(Control_n, na.rm = TRUE)  >= 0.75,
+               DM1_n / max(DM1_n, na.rm = TRUE) >= 0.75,
+               DM1_n_sig / DM1_n >= 0.25) %>%
+        select(event_name, isoforms, Control_psi_mean, Control_psi_sd, Control_n,
+                      DM1_psi_mean, DM1_psi_sd, DM1_n, delta_psi_mean, DM1_n_sig) %>%
+        arrange(desc(abs(delta_psi_mean)))
+    }
+}
+```
+
+## Identify mis-regulated nonUTRevents
+```{r Load data}
+event_type <- "nonUTRevents.multi"
+
+## Load healthy quadricep versus tibialis results
+allControls_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/allControls/allControls", event_type, "results.txt", sep = "_")))
+allControls_res <- allControls_res %>% mutate(delta_psi = Quad_psi_mean - Tibialis_psi_mean)
+
+## filter to identify events with differnet splicing patterns between the tissues
+quad_vs_tibialis <- allControls_res %>%
+    select(gene_symbol, event_name, Quad_psi_mean, Quad_n, Tibialis_psi_mean, 
+    			 Tibialis_n, Quad_vs_Tibialis_n_sig, isoforms, delta_psi) %>%
+            filter(Quad_n / max(Quad_n, na.rm = TRUE) >= 0.75,
+                   Tibialis_n / max(Tibialis_n, na.rm = TRUE) >= 0.75,
+                   abs(delta_psi) >= 0.05, Quad_vs_Tibialis_n_sig / Quad_n >= 0.25) %>%
+                       arrange(desc(Quad_vs_Tibialis_n_sig))
+
+## Load tibialis & quadricep DM_vs_Control results
+tibialis_pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_tibialis_pdata.txt"))
+tibialis_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/tibialis/tibialis", event_type, "results.txt", sep = "_")))
+tibialis_res <- tibialis_res %>% mutate(frac_sig = DM1_n_sig / DM1_n)
+
+quadricep_pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_quadricep_pdata.txt"))
+quadricep_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/quadricep/quadricep", event_type, "results.txt", sep = "_")))
+quadricep_res <- quadricep_res %>% mutate(frac_sig = DM1_n_sig / DM1_n)
+
+## Filter to identify events mis-regulated in DM1
+dm_tibialis <- find.dm.events(tibialis_res)
+dm_quadricep <- find.dm.events(quadricep_res)
+```
+
+## Compare delta psi values
+```{r}
+event_set <- intersect(union(dm_tibialis$isoforms, dm_quadricep$isoforms), quad_vs_tibialis$isoforms)
+
+deltapsi_data <- Reduce(function(...) merge(..., by = "isoforms", all = TRUE),
+                        list(select(allControls_res, gene_symbol, event_name, isoforms, delta_psi) %>% filter(isoforms %in% event_set),
+                             select(tibialis_res, isoforms, delta_psi_mean) %>% filter(isoforms %in% event_set),
+                             select(quadricep_res, isoforms, delta_psi_mean) %>% filter(isoforms %in% event_set)))
+setnames(deltapsi_data, c("isoforms", "gene_symbol", "event_name", "Quad_vs_Tibialis_deltapsi", "Tibialis", "Quad"))
+```
+
+## Scatterplots of delta psi values
+### All events dyesregulated in either quad or tibialis (DM vs Control)
+
+```{r}
+event_set <- union(dm_tibialis$isoforms, dm_quadricep$isoforms)
+deltapsi_data <- Reduce(function(...) merge(..., by = "isoforms", all = TRUE),
+                        list(select(allControls_res, gene_symbol, event_name, isoforms, delta_psi) %>% filter(isoforms %in% event_set),
+                             select(tibialis_res, isoforms, delta_psi_mean) %>% filter(isoforms %in% event_set),
+                             select(quadricep_res, isoforms, delta_psi_mean) %>% filter(isoforms %in% event_set)))
+setnames(deltapsi_data, c("isoforms", "gene_symbol", "event_name", "Quad_vs_Tibialis_deltapsi", "Tibialis", "Quad"))
+
+ggplot(deltapsi_data, aes(x = Tibialis, y = Quad, colour = cut(deltapsi_data$Quad_vs_Tibialis_deltapsi, seq(-1,1, 0.1)))) +
+    geom_point() +
+        geom_abline(yintercept = 0, slope = 1, linetype = "longdash") +
+            labs(y = "Quad Delta PSI \n DM versus Control",
+                 x = "Tibialis Delta PSI \n DM versus Control") +
+                     scale_color_discrete(name = "Quad_vs_Tibialis_deltapsi")
+```
+
+### Events dyesregulated in either quad or tibialis (DM vs Control) that are also differentially spliced between healthy quad and healthy tibialis
+
+```{r}
+event_set <- intersect(union(dm_tibialis$isoforms, dm_quadricep$isoforms), quad_vs_tibialis$isoforms)
+deltapsi_data <- Reduce(function(...) merge(..., by = "isoforms", all = TRUE),
+                        list(select(allControls_res, gene_symbol, event_name, isoforms, delta_psi) %>% filter(isoforms %in% event_set),
+                             select(tibialis_res, isoforms, delta_psi_mean) %>% filter(isoforms %in% event_set),
+                             select(quadricep_res, isoforms, delta_psi_mean) %>% filter(isoforms %in% event_set)))
+setnames(deltapsi_data, c("isoforms", "gene_symbol", "event_name", "Quad_vs_Tibialis_deltapsi", "Tibialis", "Quad"))
+
+ggplot(deltapsi_data, aes(x = Tibialis, y = Quad, colour = cut(deltapsi_data$Quad_vs_Tibialis_deltapsi, seq(-1,1, 0.1)))) +
+    geom_point() +
+        geom_abline(yintercept = 0, slope = 1, linetype = "longdash") +
+            labs(y = "Quad Delta PSI \n DM versus Control",
+                 x = "Tibialis Delta PSI \n DM versus Control") +
+                     scale_color_discrete(name = "Quad_vs_Tibialis_deltapsi")
+
+deltapsi_data_long <- gather(deltapsi_data, key = "Tissue", value = "DM_vs_Control_deltapsi", 5:6)
+ggplot(deltapsi_data_long, aes(x = Quad_vs_Tibialis_deltapsi, y = DM_vs_Control_deltapsi, colour = Tissue)) +
+    geom_point() +
+        geom_hline(yintercept = 0, linetype = "longdash") +
+            geom_vline(xintercept = 0, linetype = "longdash") +
+                labs(y = "Delta PSI \n DM versus Control",
+                     x = "Delta PSI \n Control Quad versus Control Tibialis")
+```
+
+### Linear model residuals [DM_Tibialis_deltapsi ~ DM_Quad_deltapsi] plotted against healthy quad_vs_tibialis deltapsi
+
+```{r}
+fit <- lm(Tibialis ~ Quad, data = deltapsi_data)
+cor.test(fit$residuals, deltapsi_data$Quad_vs_Tibialis_deltapsi)
+
+ggplot() +
+    geom_point(aes(y = deltapsi_data$Quad_vs_Tibialis_deltapsi, x = fit$residuals)) +
+            labs(x = "Residuals \n lm(DM_Tibialis_deltapsi ~ DM_Quad_deltapsi)",
+                 y = "Delta PSI \n Quad versus Tibials")
+```
+
+## Gene ontology term enrichment for dysregulated events in quad OR tibialis (DM vs Control) AND between controls (Quad vs Tib)
+```{r, results='hide', warning=FALSE}
+all_muscle_genes <- filter(allControls_res, Quad_n / max(Quad_n, na.rm = TRUE) >= 0.75,                                                                                                                                                        
+                           Tibialis_n / max(Tibialis_n, na.rm = TRUE) >= 0.75)$gene_symbol %>%                                                                                                                                                 
+                               unique() 
+
+## different in quad OR tibialis (DM vs Control) AND between controls (Quad vs Tib)
+sig_genes <- intersect(union(dm_tibialis$gene_symbol, dm_quadricep$gene_symbol), quad_vs_tibialis$gene_symbol)
+
+ontology_class <- "BP"
+
+myGO2genes <- AnnotationDbi::select(org.Hs.eg.db, keys = all_muscle_genes, columns=c("ENSEMBL", "GO"), keytype="SYMBOL")
+myGO2genes <- myGO2genes %>% filter(!is.na(ENSEMBL)) %>% tbl_df
+myGO2genesList <- tapply(filter(myGO2genes, ONTOLOGY == ontology_class)$ENSEMBL, filter(myGO2genes, ONTOLOGY == ontology_class)$GO, FUN = c)
+
+ensemblIDs <- myGO2genes$ENSEMBL[match(all_muscle_genes, myGO2genes$SYMBOL)]
+geneList <- factor(as.integer(all_muscle_genes %in% sig_genes))
+names(geneList) <- ensemblIDs
+
+GOdata <- new("topGOdata", description = "GO analysis of genes with differential splicing",
+              ontology = ontology_class, allGenes = geneList, nodeSize = 5,
+              annot = annFUN.GO2genes, GO2genes = myGO2genesList)
+
+resultFisher <- runTest(GOdata, algorithm = "classic", statistic = "fisher")
+resultFisher.elim <- runTest(GOdata, algorithm = "elim", statistic = "fisher")
+
+allRes <- GenTable(GOdata, classicFisher = resultFisher,
+                   elimFisher = resultFisher.elim,
+                   orderBy = "elimFisher", ranksOf = "elimFisher",
+                   topNodes = 20)
+```
+
+```{r}
+head(sig_genes, n = 50)
+```
+
+## Ontology term enrichment results
+```{r}
+kable(allRes)
+
+showSigOfNodes(GOdata, score(resultFisher.elim), firstSigNodes = 10, useInfo = "all")
+```
