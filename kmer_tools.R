@@ -14,16 +14,23 @@ getAllPossibleKmers <- function(len) {
 ## given some sequence, find all possible kmers 
 ##--------------------------------------------
 getKmersFromSeq <- function(text, k, unique=F){
-    kmers <- sapply(1:(str_length(text)-k+1), function(start){
-        end <- start + k -1
-        si <- substr(x=text, start = start, stop = end)
-        return(si)
-    })
-    
-    if (unique) {
-        return(unique(kmers))
-    } else {
+    k_mers <- lapply(sequence, function(x) {
+        seq_loop_size <- str_length(x) - k + 1  
+        if (seq_loop_size >= 1) {
+            kmers <- sapply(1:seq_loop_size, function(z) {
+                y <- z + k - 1
+                kmer <- substr(x = x, start = z, stop = y)
+                return(kmer)                
+            })
+        } else {
+            kmers <- NA
+        }            
         return(kmers)
+    })    
+    if (unique) {
+        return(lapply(k_mers, unique))
+    } else {
+        return(k_mers)
     }
 }
 

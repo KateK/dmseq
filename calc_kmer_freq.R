@@ -4,9 +4,9 @@ library(data.table)
 library(gtools)
 
 ## Import utility functions
-source("~/Analysis_Projects/DMseq/bin/kmer_tools.R")
+source("~/Projects/DMseq/bin/kmer_tools.R")
 
-setwd("~/Analysis_Projects/DMseq/")
+setwd("~/Projects/DMseq/")
 
 utr_seqs <- fread("data/ALE_metadata.txt")
 utr_seqs[, isoform_id := gsub("..$", "", isoform)]
@@ -23,11 +23,10 @@ sequence_kmer_freq <- function(sequence, k) {
             return(kmer)
         })
         return(kmers)
-    })
-    uniq <- unique(unlist(k_mers))
-    ind <- t(sapply(k_mers, function(x) {
-        tabulate(match(x, uniq), length(uniq))
-    }))
-    colnames(ind) <- uniq    
+    })    
+    ind <- lapply(k_mers, function(x) {
+        data_frame(kmer = names(table(x)), freq = table(x))
+    })    
+    # colnames(ind) <- uniq
     return(ind)
 }

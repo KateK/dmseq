@@ -20,12 +20,11 @@ results_file <- paste("~/Projects/DMseq/results/", sample_group, "/", sample_gro
 ## AFE
 ##----------------------------------
 metadata_file <- "~/Projects/DMseq/data/AFE_metadata.txt"
-results_file <- results_file <- paste("~/Projects/DMseq/results/", sample_group, "/", sample_group, "_AFE_results.txt", sep = "")
+results_file <- paste("~/Projects/DMseq/results/", sample_group, "/", sample_group, "_AFE_results.txt", sep = "")
                       
-##----------------------------------
+
 ##----------------------------------
 ## Analysis Functions
-##----------------------------------
 ##----------------------------------
 analyzeUTRmotifs <- function(metadata_file, results_file)
 {
@@ -44,8 +43,11 @@ analyzeUTRmotifs <- function(metadata_file, results_file)
     dysregulated_genes <- unique(sig_res$event_name)
     iso_seqs <- metadata %>% filter(gene_symbol %in% dysregulated_genes)
 
-    mbnl_motifs <- paste(c("GCTT", "CGCT", "TGCT", "GCGC", "CCGC", "CTGC", "GCTA", "ACGC", "CGCA", "AGCT", "TTGC", "CAGC"), collapse = "|")
-    celf_motifs <- paste(c("TGTT", "ATGT", "TTGT", "TGTC", "GTGT", "TGTA", "GTTT", "TGTG", "GTCT", "TTTT"), collapse = "|")
+    mbnl_motifs <- paste(c("GCTT", "CGCT", "TGCT", "GCGC", "CCGC", "CTGC",
+                           "GCTA", "ACGC", "CGCA", "AGCT", "TTGC", "CAGC"),
+                         collapse = "|")
+    celf_motifs <- paste(c("TGTT", "ATGT", "TTGT", "TGTC", "GTGT", "TGTA",
+                           "GTTT", "TGTG", "GTCT", "TTTT"), collapse = "|")
 
     ## sliding window over sequence; counts motifs per chunk
     chunk_size <- 10
@@ -66,8 +68,10 @@ analyzeUTRmotifs <- function(metadata_file, results_file)
     names(iso_seqs_obj) <- iso_seqs$isoform
 
     ## a PWM for mbnl /  celf may be more appropriate... 
-    mbnl_motifs <- DNAStringSet(c("GCTT", "CGCT", "TGCT", "GCGC", "CCGC", "CTGC", "GCTA", "ACGC", "CGCA", "AGCT", "TTGC", "CAGC"))
-    celf_motifs <- DNAStringSet(c("TGTT", "ATGT", "TTGT", "TGTC", "GTGT", "TGTA", "GTTT", "TGTG", "GTCT", "TTTT"))
+    mbnl_motifs <- DNAStringSet(c("GCTT", "CGCT", "TGCT", "GCGC", "CCGC", "CTGC",
+                                  "GCTA", "ACGC", "CGCA", "AGCT", "TTGC", "CAGC"))
+    celf_motifs <- DNAStringSet(c("TGTT", "ATGT", "TTGT", "TGTC", "GTGT", "TGTA",
+                                  "GTTT", "TGTG", "GTCT", "TTTT"))
 
     lapply(mbnl_motifs, function(x) vmatchPattern(x, iso_seqs_obj))
     
