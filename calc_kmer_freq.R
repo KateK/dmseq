@@ -1,9 +1,18 @@
 library(stringi)
 library(seqinr)
+library(data.table)
+library(gtools)
 
-setwd("~/Projects/DMseq/")
+## Import utility functions
+source("~/Analysis_Projects/DMseq/bin/kmer_tools.R")
 
-se_seqs <- read.fasta(file = "data/SE.cis500.fa", seqtype = "DNA", as.string = TRUE, forceDNAtolower = FALSE)
+setwd("~/Analysis_Projects/DMseq/")
+
+utr_seqs <- fread("data/ALE_metadata.txt")
+utr_seqs[, isoform_id := gsub("..$", "", isoform)]
+
+test <- utr_seqs %>% head(100) %>% as.list
+test$dist <- sequence_kmer_freq(test$sequence, 4)
 
 sequence_kmer_freq <- function(sequence, k) {
     k_mers <- lapply(sequence, function(x) {
