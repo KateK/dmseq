@@ -4,8 +4,8 @@ library("gtools")
 ##--------------------------------------------
 ## Get all possible DNA Kmers 
 ##--------------------------------------------
-getAllPossibleKmers <- function(len) {
-    allDnaVector <- permutations(4, len, c("A","T","G","C"), repeats.allowed=TRUE)
+getKmers <- function(len) {
+    allDnaVector <- permutations(n=4, r=len, v=c("A","T","G","C"), repeats.allowed=TRUE)
     allDna <- apply(allDnaVector, 1, paste0, collapse="")
     return(allDna)
 }
@@ -63,7 +63,7 @@ reverseComplement <- function (pattern) {
 ## Given a kmer, Find all kmers differing by
 ## at most 'd' mutations
 ##--------------------------------------------
-getApproximateKmers <- function(kmer, d){
+getApproximateKmers <- function(kmer, d) {
     kmerVec <- strsplit(kmer, "")[[1]]
 
     changedPos <- combn(1:length(kmerVec), d)
@@ -89,11 +89,11 @@ getApproximateKmers <- function(kmer, d){
 ## (differ by at most d positions)
 ##--------------------------------------------
 match <- function(string1, string2, d=0){
-      charStr1 <- strsplit(x=string1, split="")[[1]]
-        charStr2 <- strsplit(x=string2, split="")[[1]]
-        diff <- sum( charStr1 != charStr2)
-        return(diff <= d)
-  }
+    charStr1 <- strsplit(x=string1, split="")[[1]]
+    charStr2 <- strsplit(x=string2, split="")[[1]]
+    diff <- sum( charStr1 != charStr2)
+    return(diff <= d)
+}
 
 
 ##--------------------------------------------
@@ -346,19 +346,19 @@ scoreOfMotifsFromCountMatrix <- function(countMatrix){
 ## Find Consensus motif
 ##--------------------------------------------
 consensusMotif <- function(motifs){
-      profile <- motifsToProfile(motifs)
-        consensusMotif <- consensusMotifFromProfile(profile)
-        return(consensusMotif)
-  }
+    profile <- motifsToProfile(motifs)
+    consensusMotif <- consensusMotifFromProfile(profile)
+    return(consensusMotif)
+}
 
 consensusMotifFromProfile <- function(profile){
       cols <- colnames(profile)
-        colIndexes <- apply(profile, 1, function(row){
-                return(which(row==max(row))[1])
-            })
-        consensusVec <- cols[colIndexes]
-        consensus <- paste0(consensusVec, collapse="")
-        return(consensus)
+      colIndexes <- apply(profile, 1, function(row){
+          return(which(row==max(row))[1])
+      })
+      consensusVec <- cols[colIndexes]
+      consensus <- paste0(consensusVec, collapse="")
+      return(consensus)
   }
 
 ##--------------------------------------------
