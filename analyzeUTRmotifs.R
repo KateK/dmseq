@@ -33,9 +33,7 @@ analyzeUTRmotifs <- function(metadata_file, results_file)
     require(Biostrings)
 
     metadata <- tbl_dt(fread(metadata_file))
-
     res <- tbl_dt(fread(results_file))
-    res[, isoform := gsub("'", "", isoforms)]
 
     sig_res <- res %>% filter(DM1_n_sig > 11,
                               abs(delta_psi_mean) >= 0.05)

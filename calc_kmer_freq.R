@@ -1,7 +1,7 @@
-library(stringi)
-library(seqinr)
 library(data.table)
+library(seqinr)
 library(gtools)
+library(dplyr)
 
 ## Import utility functions
 source("~/Projects/DMseq/bin/motif_utils.R")
@@ -13,7 +13,5 @@ utr_seqs[, isoform_id := gsub("..$", "", isoform)]
 
 test <- utr_seqs %>% head(100) %>% as.list
 
-test$dist <- lapply(lapply(test$sequence, getKmersFromSeq, 4), table)
-
+test$dist <- kmerEnumerate(test$sequence, 6)
 test$dist
-

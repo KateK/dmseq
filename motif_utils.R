@@ -15,12 +15,12 @@ getAllPossibleKmers <- function(len) {
 ##--------------------------------------------
 ## given some sequence, find all possible kmers 
 ##--------------------------------------------
-getKmersFromSeq <- function(sequence, k, unique=F) {
-    seq_loop_size <- str_length(sequence) - k + 1  
+getKmersFromString <- function(string, k, unique=F) {
+    seq_loop_size <- str_length(string) - k + 1  
     if (seq_loop_size >= 1) {
         kmers <- sapply(1:seq_loop_size, function(z) {
             y <- z + k - 1
-            kmer <- substr(x = sequence, start = z, stop = y)
+            kmer <- substr(x = string, start = z, stop = y)
             return(kmer)                
         })
     } else {
@@ -75,16 +75,19 @@ hammingDistance <- function(query, subject) {
     ## Only allow one query & subject
     stopifnot(length(subject) == 1 & length(query) == 1)
     ## make sure query is shorter than subject
-    stopifnot(str_length(query) < str_length(subject))
-    ## Define starts and ends based on query length
-    start <- 1:(str_length(subject) - str_length(query) + 1)
-    end <- str_length(query):str_length(subject)
-    ## calculate distance
-    ch1 <- stringToCharVec(query)
-    ch2 <- substring(subject, start, end)    
-    ch2 <- lapply(ch2, stringToCharVec)
-    res <- unlist(lapply(ch2, function(x) sum(ch1 != x)))
-    return(setNames(res, start))
+    if (str_length(query) > str_length(subject)) {
+        return(numeric(0))
+    } else {
+        ## Define starts and ends based on query length
+        start <- 1:(str_length(subject) - str_length(query) + 1)
+        end <- str_length(query):str_length(subject)
+        ## calculate distance
+        ch1 <- stringToCharVec(query)
+        ch2 <- substring(subject, start, end)    
+        ch2 <- lapply(ch2, stringToCharVec)
+        res <- unlist(lapply(ch2, function(x) sum(ch1 != x)))
+        return(setNames(res, start))
+    }
 }
 
 ##--------------------------------------------
@@ -110,15 +113,9 @@ findMatches <- function(pattern, string, d=0, indexBase=1) {
 ## if a' appears in each string from string with at most d mismatches
 ## output the number of times a' appears
 ##--------------------------------------------
-kmerEnumerate <- function(stringCollection, k, d = 0) {
-    allKmers <- lapply(dnaCollection, getKmersFromSeq, k, unique = TRUE)
-    allKmers <- unique(unlist(allKmers))
-    findAllKmersinString <- function(string, kmers, d = 0) {
-        matches <- lapply(kmers, findMatches, string = string, d = d)
-        matches <- setNames(matches, kmers)
-        return(matches[lapply(matches, length) > 0])
-    }    
-    enumerated_kmers <- lapply(stringCollection, findAllKmersinString, kmers = allKmers, d = d)    
+kmerEnumerate <- function(stringCollection, k) {
+    kmerized_strings <- lapply(stringCollection, getKmersFromString, k)
+    enumerated_kmers <- lapply(kmerized_strings, table)    
     return(enumerated_kmers)
 }
 
