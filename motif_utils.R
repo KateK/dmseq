@@ -121,15 +121,24 @@ kmerEnumerate <- function(stringCollection, k) {
 
 ##--------------------------------------------
 ## for collection of kmers
-## calculate the hamming distance between each
+## calculate the distance between each
 ## pair 
 ##
 ## output all clusters of kmers 
 ##--------------------------------------------
-clusterSimilarKmers <- function(kmerCollection, maxDistance = 1) {
+clusterKmers <- function(kmerCollection, maxDistance = 1) {
 
 stop("ERROR: Not implemented")
     
+}
+
+##--------------------------------------------
+## Find consensus for a set of kmers
+##--------------------------------------------
+findConsensus <- function(kmers, ...) {
+    require(Biostrings)
+    kmer_set <- DNAStringSet(kmers)
+    consensusString(kmer_set, ...)    
 }
 
 ##--------------------------------------------
@@ -143,14 +152,29 @@ selectRandomKmer <- function(text, k){
 }
 
 ##--------------------------------------------
-## convert to counts matrix
+## convert set of motifs to counts matrix
 ##--------------------------------------------
 motifsToCountMatrix <- function(motifs, pseudocount=F) {
-    motiffMatrix <- sapply(motifs, stringToCharVec)
-    countMat <- apply(motiffMatrix, 1, table)
-    countMat <- t(countMat)
+    motifMatrix <- sapply(motifs, stringToCharVec)
+    countMat <- apply(motifMatrix, 1, function(row)
+        {
+            freqA <- sum(row=="A")
+            freqC <- sum(row=="C")
+            freqG <- sum(row=="G")
+            freqT <- sum(row=="T")
+            return(c(freqA, freqC, freqG, freqT))
+        })
+    rownames(countMat) <- c("A","C","G","T")
     if (pseudocount) {
         countMat <- countMat + 1
     }
     return(countMat)
+}
+
+##--------------------------------------------
+## convert set of motifs to prob matrix
+##--------------------------------------------
+motifsToProbMatrix <- function(motifs, pseudocount=F) {
+    countMat <- motifsToCountMatrix(motifs, pseudocount)
+    return(countMat / colSums(countMat))
 }

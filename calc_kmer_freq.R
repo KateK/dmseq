@@ -13,5 +13,9 @@ utr_seqs[, isoform_id := gsub("..$", "", isoform)]
 
 test <- utr_seqs %>% head(100) %>% as.list
 
-test$dist <- kmerEnumerate(test$sequence, 6)
+kmerEnumerate(test$sequence, 6)
+
+vmatchPattern("YGCY", DNAStringSet(test$sequence), fixed = FALSE)
+vcountPattern("YGCY", DNAStringSet(test$sequence), fixed = FALSE)
+
 test$dist
