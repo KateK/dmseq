@@ -1,5 +1,5 @@
-library("stringr")
-library("gtools")
+library(stringr)
+library(gtools)
 
 ##--------------------------------------------
 ## Get all possible DNA Kmers 
@@ -104,35 +104,56 @@ findMatches <- function(pattern, string, d=0, indexBase=1) {
     return(as.numeric(matchIndexes))
 }
 
-## MOTIFENUMERATION(Dna, k, d)
-## for each k-mer a in Dna
-## for each k-mer a' differing from a by at most d mutations
-## if a' appears in each string from Dna with at most d mutations
+##--------------------------------------------
+## for each k-mer a in string
+## for each k-mer a' differing from a by at most d mismatches
+## if a' appears in each string from string with at most d mismatches
 ## output the number of times a' appears
-motifEnumerate <- function(dnaCollection, k, d) {
+##--------------------------------------------
+kmerEnumerate <- function(stringCollection, k, d = 0) {
     allKmers <- lapply(dnaCollection, getKmersFromSeq, k, unique = TRUE)
     allKmers <- unique(unlist(allKmers))
-
-    allApproximateKmers <- lapply(allKmers, getApproximateKmers, d)
-    allApproximateKmers <- unique(unlist(allApproximateKmers))
-   
-    hasSegmentInDna <- function(dna, segment, d=0) {
-        matchIndexes <- findMatches(string=dna, pattern=segment, d=d)
-        return(length(matchIndexes))
-    }
-
-    hasSegmentInAllDna <- function(dnaCollection, segment, d=0) {
-        hasInDnaCollection <- sapply(dnaCollection, hasSegmentInDna, segment, d)
-        return(hasInDnaCollection)
-    }
-
-    isMotif <- sapply(allApproximateKmers, function(kmer)
-        {
-            return(hasSegmentInAllDna(dnaCollection, kmer, d))
-        })
-    
-    motifs <- allApproximateKmers[isMotif]
-    return(motifs)
+    findAllKmersinString <- function(string, kmers, d = 0) {
+        matches <- lapply(kmers, findMatches, string = string, d = d)
+        matches <- setNames(matches, kmers)
+        return(matches[lapply(matches, length) > 0])
+    }    
+    enumerated_kmers <- lapply(stringCollection, findAllKmersinString, kmers = allKmers, d = d)    
+    return(enumerated_kmers)
 }
 
-# debug(motifEnumerate)
+##--------------------------------------------
+## for collection of kmers
+## calculate the hamming distance between each
+## pair 
+##
+## output all clusters of kmers 
+##--------------------------------------------
+clusterSimilarKmers <- function(kmerCollection, maxDistance = 1) {
+
+stop("ERROR: Not implemented")
+    
+}
+
+##--------------------------------------------
+## select random kmer from string
+##--------------------------------------------
+selectRandomKmer <- function(text, k){
+    maxStart <- str_length(text) - k + 1
+    randomKmerStart <- sample(1:maxStart, size=1)
+    randomKmer <- substr(x=text, start=randomKmerStart, stop=randomKmerStart+k-1)
+    return(randomKmer)
+}
+
+##--------------------------------------------
+## convert to counts matrix
+##--------------------------------------------
+motifsToCountMatrix <- function(motifs, pseudocount=F) {
+    motiffMatrix <- sapply(motifs, stringToCharVec)
+    countMat <- apply(motiffMatrix, 1, table)
+    countMat <- t(countMat)
+    if (pseudocount) {
+        countMat <- countMat + 1
+    }
+    return(countMat)
+}
