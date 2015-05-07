@@ -25,7 +25,7 @@ gff_file <- "~/Projects/dmseq/data/event_annotations/polyAseq.hg19.entrezID.v2.g
 
 polyA_res <- MisoGffToBed(gff_file, event_type = "polyA")
 
-write.table(polyA_res, file = "~/Projects/dmseq/data/nonUTRevents.multi_metadata.txt",
+write.table(polyA_res, file = "~/Projects/dmseq/data/polyA_entrezID_metadata.txt",
             col.names = TRUE, row.names = FALSE, sep = "\t", quote = FALSE)
 
 ##----------------------------------
