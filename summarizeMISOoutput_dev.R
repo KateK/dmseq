@@ -76,9 +76,9 @@ summarizeMISOoutput <- function(consolidated_summary_file, consolidated_bayesfac
             if (bf_wide_format) {
                 return("WARNING: Data was not filtered. Use a consolidated_bayesfactor_file in long format.")
             } else {
-                x <- paste(con_summaries$sample, con_summaries[["isoforms"]], sep ="_")
-                y <- paste(con_bf$sample1, con_bf[["isoforms"]], sep ="_")
-                z <- paste(con_bf$sample2, con_bf[["isoforms"]], sep ="_")
+                x <- paste(con_summaries$sample, con_summaries[[main_grouping_var]], sep ="_")
+                y <- paste(con_bf$sample1, con_bf[[main_grouping_var]], sep ="_")
+                z <- paste(con_bf$sample2, con_bf[[main_grouping_var]], sep ="_")
                 con_bf <- con_bf[y %in% x & z %in% x,]
                 rm(list = c("x", "y", "z"))
             }
