@@ -15,24 +15,24 @@ library(RColorBrewer)
 find.dm.events <- function(DT) {
     if("gene_symbol" %in% colnames(DT)){
         DT %>%
-        filter(abs(delta_psi_mean) >= 0.05,
+        filter(abs(Control_psi_mean - DM1_psi_mean) >= 0.05,
                Control_psi_sd < 0.2,
                Control_n / max(Control_n, na.rm = TRUE)  >= 0.75,
                DM1_n / max(DM1_n, na.rm = TRUE) >= 0.75,
-               DM1_n_sig / DM1_n >= 0.25) %>%
+               DM1_vs_Control_n_sig / DM1_n >= 0.25) %>%
         select(gene_symbol, event_name, isoforms, Control_psi_mean, Control_psi_sd, Control_n,
-                      DM1_psi_mean, DM1_psi_sd, DM1_n, delta_psi_mean, DM1_n_sig) %>%
-        arrange(desc(abs(delta_psi_mean)))
+                      DM1_psi_mean, DM1_psi_sd, DM1_n, DM1_vs_Control_n_sig) %>%
+        arrange(desc(abs(Control_psi_mean - DM1_psi_mean)))
     } else {
         DT %>%
-        filter(abs(delta_psi_mean) >= 0.05,
+        filter(abs(Control_psi_mean - DM1_psi_mean) >= 0.05,
                Control_psi_sd < 0.2,
                Control_n / max(Control_n, na.rm = TRUE)  >= 0.75,
                DM1_n / max(DM1_n, na.rm = TRUE) >= 0.75,
-               DM1_n_sig / DM1_n >= 0.25) %>%
+               DM1_vs_Control_n_sig / DM1_n >= 0.25) %>%
         select(event_name, isoforms, Control_psi_mean, Control_psi_sd, Control_n,
-                      DM1_psi_mean, DM1_psi_sd, DM1_n, delta_psi_mean, DM1_n_sig) %>%
-        arrange(desc(abs(delta_psi_mean)))
+                      DM1_psi_mean, DM1_psi_sd, DM1_n, DM1_vs_Control_n_sig) %>%
+        arrange(desc(abs(Control_psi_mean - DM1_psi_mean)))
     }
 }
 
@@ -42,8 +42,8 @@ find.dm.events <- function(DT) {
 ##----------------------------------
 event_type <- "nonUTRevents.multi"
 
-sample_pdata <- tbl_dt(fread("~/Analysis_Projects/DMseq/data/DM_sample_pdata.txt"))
-allControls_res <- tbl_dt(fread(paste("~/Analysis_Projects/DMseq/results/allControls/allControls", event_type, "results.txt", sep = "_")))
+sample_pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_sample_pdata.txt"))
+allControls_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/allControls/allControls", event_type, "results.txt", sep = "_")))
 
 quad_vs_tibialis <- allControls_res %>%
     select(gene_symbol, event_name, Quad_psi_mean, Quad_n, Tibialis_psi_mean, Tibialis_n, Quad_vs_Tibialis_n_sig, isoforms) %>%
@@ -52,14 +52,14 @@ quad_vs_tibialis <- allControls_res %>%
                    delta_psi > 0.05, Quad_vs_Tibialis_n_sig > 4) %>%
                        arrange(desc(Quad_vs_Tibialis_n_sig))
 
-tibialis_res <- tbl_dt(fread(paste("~/Analysis_Projects/DMseq/results/tibialis/tibialis", event_type, "results.txt", sep = "_")))
-tibialis_pdata <- tbl_dt(fread("~/Analysis_Projects/DMseq/data/tibialis/DM_tibialis_pdata.txt"))
+tibialis_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/tibialis/tibialis", event_type, "results.txt", sep = "_")))
+tibialis_pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_tibialis_pdata.txt"))
 
-quadricep_pdata <- tbl_dt(fread("~/Analysis_Projects/DMseq/data/quadricep/DM_quadricep_pdata.txt"))
-quadricep_res <- tbl_dt(fread(paste("~/Analysis_Projects/DMseq/results/quadricep/quadricep", event_type, "results.txt", sep = "_")))
+quadricep_pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_quadricep_pdata.txt"))
+quadricep_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/quadricep/quadricep", event_type, "results.txt", sep = "_")))
 
-heart_pdata <- tbl_dt(fread("~/Analysis_Projects/DMseq/data/heart/DM_heart_pdata.txt"))
-heart_res <- tbl_dt(fread(paste("~/Analysis_Projects/DMseq/results/heart/heart", event_type, "results.txt", sep = "_")))
+heart_pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_heart_pdata.txt"))
+heart_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/heart/heart", event_type, "results.txt", sep = "_")))
 
 dm_heart <- find.dm.events(heart_res)
 dm_tibialis <- find.dm.events(tibialis_res)
@@ -69,30 +69,16 @@ dysregulated_events <- Reduce(union, list(dm_tibialis$isoforms, dm_quadricep$iso
 gene_set <- intersect(quad_vs_tibialis$isoforms, dysregulated_events)
 
 ##----------------------------------
-## nonUTRevents.nonmulti
-##----------------------------------
-con_f <- "~/MISO/single_end_mode/summaries/tibialis/nonUTRevents.nonmulti_consolidatedSummaries.txt"
-res_f <- "~/Analysis_Projects/DMseq/results/nonUTRevents.nonmulti_results.txt"
-cor_f <- "~/Analysis_Projects/DMseq/results/nonUTRevents.nonmulti_strength_cor.txt"
-repeat_length_cor_f <- "~/Analysis_Projects/DMseq/results/nonUTRevents.nonmulti_repeat_length_cor.txt"
-event_key_file <- "~/alt.splicing.annotations/hg19_Aug2014/nonUTRevents.nonmulti.hg19.to.ensGene.txt"
-
-##----------------------------------
 ## nonUTRevents.multi
 ##----------------------------------
-con_f <- "~/MISO/single_end_mode/summaries/tibialis/nonUTRevents.multi_consolidatedSummaries.txt"
-res_f <- "~/Analysis_Projects/DMseq/results/nonUTRevents.multi_results.txt"
-cor_f <- "~/Analysis_Projects/DMseq/results/nonUTRevents.multi_cor.txt"
-event_key_file <- "~/alt.splicing.annotations/hg19_Aug2014/nonUTRevents.multi.hg19.to.ensGene.txt"
-
+tissue <- "tibialis"
+con_f <- paste("~/Projects/DMseq/data/", tissue, "/", tissue, "_nonUTRevents.multi_consolidatedSummaries.txt", sep = "")
+res_f <- paste("~/Projects/DMseq/results/", tissue, "/", tissue, "_nonUTRevents.multi_results.txt", sep = "")
+cor_f <- paste("~/Projects/DMseq/results/", tissue, "/", tissue, "_nonUTRevents.multi_cor.txt", sep = "")
 
 ##----------------------------------
-## ALE
+## 
 ##----------------------------------
-con_f <- "~/MISO/single_end_mode/summaries/tibialis/ALE_consolidatedSummaries.txt"
-res_f <- "~/Analysis_Projects/DMseq/results/ALE_results.txt"
-cor_f <- "~/Analysis_Projects/DMseq/results/ALE_strength_cor.txt"
-
 res_data <- fread(res_f)
 cor_data <- fread(cor_f)
 con_data <- fread(con_f)

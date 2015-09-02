@@ -1,11 +1,6 @@
 ##----------------------------------
-## required libraries
+## sample metadata
 ##----------------------------------
-library(dplyr)
-library(data.table)
-library(reshape2)
-library(foreach)
-
 pdata_file <- "~/Analysis_Projects/mbnl1_dose_paper/data/DM_tibialis_pdata.txt"
 
 ##----------------------------------
@@ -19,18 +14,6 @@ cor_data <- calc_correlations(consolidated_summary_file, pdata_file,
                               grouping_var = "isoforms", counts_filter = TRUE)
 
 write.table(cor_data, file = "~/Analysis_Projects/DMseq/results/nonUTRevents.multi_cor.txt", sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
-
-##----------------------------------
-## nonUTRevents.nonmulti
-##----------------------------------
-## consolidated_summary_file <- "~/MISO/single_end_mode/summaries/tibialis/nonUTRevents.nonmulti_consolidatedSummaries.txt"
-## event_key_file <- "~/alt.splicing.annotations/hg19_Aug2014/nonUTRevents.nonmulti.hg19.to.ensGene.txt"
-
-## cor_data <- calc_correlations(consolidated_summary_file, pdata_file,
-##                               gff_file = NULL, event_key_file = event_key_file,
-##                               grouping_var = "event_name", counts_filter = TRUE)
-
-## write.table(cor_data, file = "~/Analysis_Projects/DMseq/results/nonUTRevents.nonmulti_cor.txt", sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
 
 ##----------------------------------
 ## ALE
@@ -113,8 +96,8 @@ calc_correlations <- function(consolidated_summary_file, pdata_file,
                           cor_ADF.QMT = cor.test(miso_posterior_mean, ADF.QMT, method = "pearson", use = "pairwise.complete.obs")$estimate,
                           pval_ADF.QMT = cor.test(miso_posterior_mean, ADF.QMT, method = "pearson", use = "pairwise.complete.obs")$p.value,
                           n_complete_ADF.QMT = sum(complete.cases(miso_posterior_mean, ADF.QMT)),
-                          cor_Actual.Strength.6pt.Scale = cor.test(miso_posterior_mean, Actual.Strength.6pt.Scale, method = "pearson", use = "pairwise.complete.obs")$estimate,
-                          pval_Actual.Strength.6pt.Scale = cor.test(miso_posterior_mean, Actual.Strength.6pt.Scale, method = "pearson", use = "pairwise.complete.obs")$p.value,
+                          cor_Actual.Strength.6pt.Scale = cor.test(miso_posterior_mean, Actual.Strength.6pt.Scale, method = "spearman", use = "pairwise.complete.obs")$estimate,
+                          pval_Actual.Strength.6pt.Scale = cor.test(miso_posterior_mean, Actual.Strength.6pt.Scale, method = "spearman", use = "pairwise.complete.obs")$p.value,
                           n_complete_Actual.Strength.6pt.Scale = sum(complete.cases(miso_posterior_mean, Actual.Strength.6pt.Scale)))
 
     ## Correlate psi values with repeat length ##

@@ -56,18 +56,66 @@ quad_vs_tibialis <- allControls_res %>%
                Quad_vs_Tibialis_n_sig / Quad_n >= 0.25) %>%
                    arrange(desc(Quad_vs_Tibialis_n_sig))
 
+## compare quad and tibialis psi values from healthy indivudals
+allControls_res %>%
+    filter(Quad_n / max(Quad_n, na.rm = TRUE) >= 0.75,
+           Tibialis_n / max(Tibialis_n, na.rm = TRUE) >= 0.75) %>%
+        group_by(isoforms) %>%
+            summarize(delta_psi = Quad_psi_mean - Tibialis_psi_mean, mean_psi = (Quad_psi_mean + Tibialis_psi_mean)/2) %>%
+                ggplot(aes(x = mean_psi, y = delta_psi,
+                           color = isoforms %in% quad_vs_tibialis$isoforms,
+                           alpha = isoforms %in% quad_vs_tibialis$isoforms)) +
+                    geom_point() +
+                        scale_alpha_discrete(range = c(0.25, 0.9)) +
+                            guides(col = guide_legend(title = "Differentially Regulated"),
+                                   alpha = FALSE) +
+                                labs(x = "Mean PSI",
+                                     y = "Delta PSI \n Healthy Quadricep vs Healthy Tibialis") +
+                                    theme_bw(20)
+
+
+allControls_res %>%
+    filter(Quad_n / max(Quad_n, na.rm = TRUE) >= 0.75,
+           Tibialis_n / max(Tibialis_n, na.rm = TRUE) >= 0.75) %>%
+        group_by(isoforms) %>%
+            summarize(delta_psi = Quad_psi_mean - Tibialis_psi_mean, mean_psi = (Quad_psi_mean + Tibialis_psi_mean)/2) %>%
+                ggplot(aes(x = delta_psi, color = isoforms %in% quad_vs_tibialis$isoforms)) +
+                    stat_ecdf() +
+                        labs(x = "CDF",
+                             y = "Delta PSI \n Healthy Quadricep vs Healthy Tibialis") +
+                            theme_bw(20)
+##
+## Load DM vs control data for each tissue
+##
 tibialis_pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_tibialis_pdata.txt"))
 tibialis_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/tibialis/tibialis", event_type, "results.txt", sep = "_")))
 
 quadricep_pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_quadricep_pdata.txt"))
 quadricep_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/quadricep/quadricep", event_type, "results.txt", sep = "_")))
 
-heart_pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_heart_pdata.txt"))
-heart_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/heart/heart", event_type, "results.txt", sep = "_")))
-
-dm_heart <- find.dm.events(heart_res)
 dm_tibialis <- find.dm.events(tibialis_res)
 dm_quadricep <- find.dm.events(quadricep_res)
+
+## plot all dm vs control delta psi
+setnames(tibialis_res, c(paste("tibialis_", names(tibialis_res)[1:17], sep = ""), "isoforms"))
+setnames(quadricep_res, c(paste("quad_", names(quadricep_res)[1:17], sep = ""), "isoforms"))
+common_events <- inner_join(quadricep_res, tibialis_res, by = "isoforms")
+
+common_events %>% 
+    filter(tibialis_Control_n / max(tibialis_Control_n, na.rm = TRUE) >= 0.75,
+           tibialis_DM1_n / max(tibialis_DM1_n, na.rm = TRUE) >= 0.75,
+           quad_Control_n / max(quad_Control_n, na.rm = TRUE) >= 0.75,
+           quad_DM1_n / max(quad_DM1_n, na.rm = TRUE) >= 0.75) %>%
+        ggplot(aes(x=tibialis_delta_psi_mean, y=quad_delta_psi_mean,
+                   alpha = isoforms %in% union(dm_tibialis$isoforms, dm_quadricep$isoforms),
+                   color = isoforms %in% union(dm_tibialis$isoforms, dm_quadricep$isoforms))) +
+            geom_point()+
+                scale_alpha_discrete(range = c(0.25, 0.9)) +
+                    guides(col = guide_legend(title = "Dysregulated in DM1"),
+                           alpha = FALSE) +
+                        labs(x = "Tibialis Delta PSI \n DM1 vs. Control",
+                             y = "Quadricep Delta PSI \n DM1 vs. Control") +
+                            theme_bw(20)
 
 ##----------------------------------
 ## load psi value data
@@ -149,6 +197,7 @@ sig_genes <- Reduce(intersect, list(dm_tibialis$gene_symbol, dm_quadricep$gene_s
 sig_genes <- intersect(union(dm_tibialis$gene_symbol, dm_quadricep$gene_symbol), quad_vs_tibialis$gene_symbol)
 
 ontology_class <- "BP"
+ontology_class <- "MF"
 
 myGO2genes <- AnnotationDbi::select(org.Hs.eg.db, keys = all_muscle_genes, columns=c("ENSEMBL", "GO"), keytype="SYMBOL")
 myGO2genes <- myGO2genes %>% filter(!is.na(ENSEMBL)) %>% tbl_df
@@ -170,10 +219,10 @@ allRes <- GenTable(GOdata, classicFisher = resultFisher,
                    orderBy = "elimFisher", ranksOf = "classicFisher",
                    topNodes = 20)
 
-allRes
+kable(allRes)
 
 ## plot GO graph
-showSigOfNodes(GOdata, score(resultFisher.elim), firstSigNodes = 5, useInfo = "all")
+showSigOfNodes(GOdata, score(resultFisher), firstSigNodes = 5, useInfo = "all")
 
 ##----------------------------------
 ## compare to gene set that correlates

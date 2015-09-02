@@ -2,10 +2,9 @@
 ##'
 ##' Calculate summary statistics [mean & sd] for each event for defined groups
 ##' 
-##' @param consolidated_summary_file 
+##' @param consolidated_summary_file consolidated sample summaries from MISO 
+##' @param consolidated_bayesfactor_file [optional] consolidated sample comparisons from MISO
 ##' @param pdata_file metadata about samples
-##' @param consolidated_bayesfactor_file [optional] used to summarizes the number of samples that were, on average, different from controls
-##' @param bf_wide_format [TRUE/FALSE] is consolidated_bayesfactor_file in wide format?
 ##' @param main_grouping_var if MISO was run using multi-isoform annotations use "isoforms", otherwise use "event_name"
 ##' @param aggregate_stats_by_vars [default: "Diagnosis"] aggregate statistics using these sample grouping variables
 ##' @param aggregate_stats_for_vars [default: "miso_posterior_mean"] aggregate statistics for these sample variables
@@ -13,11 +12,11 @@
 ##' @param inform_counts [default: 20] filtering criteria - minimum number of informative inclusion/exclusion reads required for an event
 ##' @param exclude_samples [optional] which samples (if any) should be excluded from the analysis?
 ##' @param event_key_file [optional] used to map 'main_grouping_var' to gene_symbol
+##' @param bf_wide_format [TRUE/FALSE] is consolidated_bayesfactor_file in wide format?
 ##' @return data.frame / data.table 
 ##' @author Adam Struck
 summarizeMISOoutput <- function(consolidated_summary_file, consolidated_bayesfactor_file = NULL,
-                                pdata_file, bf_wide_format = FALSE,
-                                main_grouping_var = "isoforms", aggregate_stats_by_vars = c("Diagnosis"),
+                                pdata_file, main_grouping_var = "isoforms", aggregate_stats_by_vars = c("Diagnosis"),
                                 aggregate_stats_for_vars = c("miso_posterior_mean"), 
                                 counts_filter = TRUE, inform_counts = 20,
                                 exclude_samples = NULL, event_key_file = NULL)
@@ -34,7 +33,11 @@ summarizeMISOoutput <- function(consolidated_summary_file, consolidated_bayesfac
     con_summaries <- con_summaries %>% filter(!sample %in% exclude_samples)
     
     if (counts_filter) {
-        con_summaries <- con_summaries[sum_informative_counts >= inform_counts,]        
+        if (!"sum_informative_counts" %in% names(con_summaries)) {
+            source("./sum.informativeMisoCounts.R")
+            con_summaries[, sum_informative_counts := sum.InformativeMisoCounts(con_summaries$counts)]
+        }
+        con_summaries <- con_summaries %>% filter(sum_informative_counts >= inform_counts)
     }
 
     pdata <- fread(pdata_file, header = TRUE) 
@@ -89,7 +92,7 @@ summarizeMISOoutput <- function(consolidated_summary_file, consolidated_bayesfac
             group_comps <- get_group_comps(aggregate_stats_by_var, pdata)
             n_sig <- summarizeBF(group_comps,
                                  grouping_var = aggregate_stats_by_var,
-                                 main_grouping_var, con_bf, pdata, bf_wide_format)
+                                 main_grouping_var, con_bf, pdata)
         }
         
         if (!is.data.table(all_n_sig)) {
@@ -112,7 +115,17 @@ summarizeMISOoutput <- function(consolidated_summary_file, consolidated_bayesfac
     return(results_summary)
 }
 
-
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##' @title summarize_field
+##' @param inputDT data.table object of consolidated summaries
+##' @param field variable for which summary stats will be calculated
+##' @param grouping_vars What variables should observations be grouped by prior to aggregation?
+##' @param newname new name for "field"
+##' @param return_n [TRUE/FALSE] return number of non-NA observations for "field"
+##' @return data.table
+##' @author Adam Struck
 summarize_field <- function(inputDT, field, grouping_vars, newname, return_n = TRUE) {
     if (is.character(grouping_vars) & length(grouping_vars) != 2) {
         stop("ERROR: grouping_vars must be a character vector of length 2")
@@ -124,7 +137,9 @@ summarize_field <- function(inputDT, field, grouping_vars, newname, return_n = T
     field_summary <- list(mean = ~mean(x, na.rm=TRUE), sd = ~sd(x, na.rm=TRUE), n = ~sum(!is.na(x)))
     field_summary <- lapply(field_summary, lazyeval::interp, x = as.symbol(field)) 
     ## aggregate stats
-    int_res <- inputDT %>% group_by_(grouping_vars[1], grouping_vars[2]) %>% summarize_(.dots = field_summary)
+    int_res <- inputDT %>%
+        group_by_(grouping_vars[1], grouping_vars[2]) %>%
+        summarize_(.dots = field_summary)
     ## split into wide format
     stats <- c("mean", "sd")
     for (i in 1:length(stats)) {
@@ -154,7 +169,14 @@ summarize_field <- function(inputDT, field, grouping_vars, newname, return_n = T
     return(res)
 }
 
-## Define all possible sample group comparisons 
+##' Get all possible sample comparisons for set groups
+##'
+##' .. content for \details{} ..
+##' @title get_group_comps
+##' @param group_var variable to group samples by
+##' @param pdata data.table object containing sample metadata
+##' @return list
+##' @author Adam Struck
 get_group_comps <- function(group_var, pdata) {
     groups <- unique(pdata[[group_var]])
     group_comps <- NULL
@@ -181,62 +203,59 @@ get_group_comps <- function(group_var, pdata) {
     return(res)
 }
 
-summarizeBF <- function(group_comps, grouping_var, main_grouping_var, con_bf, pdata, bf_wide_format) {
-    if (bf_wide_format) {
-        for (i in 1:length(group_comps)) {
-            group <- unlist(str_split(names(group_comps)[i], "_vs_"))[1]
-            sample_group <- pdata[pdata[[grouping_var]] == group,]$sample
-            for (j in 1:length(sample_group)) {
-                sample_ID <- sample_group[j]
-                tmp <- con_bf[, names(con_bf) %in% group_comps[[i]][grep(pattern = sample_ID, group_comps[[i]])]]
-                medians <- apply(tmp, 1, median, na.rm = TRUE)
-                assign(as.character(sample_ID),
-                       data.frame(con_bf[[main_grouping_var]], medians),
-                       envir = .GlobalEnv)
-                setnames(get(sample_ID), c(main_grouping_var, sample_ID))
-            }
-            median_bf <- Reduce(function(...) merge(..., by = main_grouping_var, all = TRUE), lapply(sample_group, get))
-            rm(list = sample_group, envir = .GlobalEnv)
-            if (i == 1){
-                n_sig <- data.table(median_bf[[main_grouping_var]],
-                                    n_sig = apply(median_bf[, 2:dim(median_bf)[2], with = F], 1, function(x) length(x[x >= 5 & !is.na(x)])))
-                setnames(n_sig, c(main_grouping_var, paste(names(group_comps)[i], "n_sig", sep = "_")))
-            } else {
-                comps <- data.frame(median_bf[[main_grouping_var]],
-                                    n_sig = apply(median_bf[, 2:dim(median_bf)[2], with = F], 1, function(x) length(x[x >= 5 & !is.na(x)])))
-                setnames(comps, c(main_grouping_var, paste(names(group_comps)[i], "n_sig", sep = "_")))
-                n_sig <- merge(n_sig, comps, by = main_grouping_var, all = TRUE)
-            }
-        }
-    } else {
-        if (!"comp" %in% names(con_bf)) {
-            con_bf[, comp := paste(sample1, "vs", sample2, sep = "_")]
-        }
-        for (i in 1:length(group_comps)) {
-            group <- unlist(str_split(names(group_comps)[i], "_vs_"))[1]
-            sample_group <- pdata[pdata[[grouping_var]] == group,]$sample
-            for (j in 1:length(sample_group)) {
-                sample_ID <- sample_group[j]
-                assign(as.character(sample_ID), con_bf %>%
-                           filter(comp %in% group_comps[[i]][grep(pattern = sample_ID, group_comps[[i]])]) %>%
-                               group_by_(main_grouping_var) %>%
-                                   summarize(n_sig = median(bayes_factor, na.rm = TRUE)),
-                       envir = .GlobalEnv)
-                setnames(get(sample_ID), c(main_grouping_var, sample_ID))
-            }
-            median_bf <- Reduce(function(...) merge(..., by = main_grouping_var, all = TRUE), lapply(sample_group, get))
-            rm(list = sample_group, envir = .GlobalEnv)
-            if (i == 1){
-                n_sig <- data.table(median_bf[[main_grouping_var]],
-                                    n_sig = apply(median_bf[, 2:dim(median_bf)[2], with = F], 1, function(x) length(x[x >= 5 & !is.na(x)])))
-                setnames(n_sig, c(main_grouping_var, paste(names(group_comps)[i], "n_sig", sep = "_")))
-            } else {
-                comps <- data.table(median_bf[[main_grouping_var]],
-                                    n_sig = apply(median_bf[, 2:dim(median_bf)[2], with = F], 1, function(x) length(x[x >= 5 & !is.na(x)])))
-                setnames(comps, c(main_grouping_var, paste(names(group_comps)[i], "n_sig", sep = "_")))
-                n_sig <- merge(n_sig, comps, by = main_grouping_var, all = TRUE)
-            }
-        }
+##' Summarize MISO comparison data
+##'
+##' .. content for \details{} ..
+##' @title summarizeBF
+##' @param group_comps list of sample comparisons
+##' @param grouping_var variable that seperates the samples are we comparing into groups
+##' @param main_grouping_var how events are grouped; isoform or event (some events have more than 2 isoforms)
+##' @param con_bf data.table with columns: sample1, sample2, diff, bayes_factor
+##' @param pdata data.table with sample information for grouping
+##' @param threshold list of thresholds to use when summarizing group-level comparisons 
+##' @return data.table
+##' @author Adam Struck
+summarizeBF <- function(group_comps, grouping_var, main_grouping_var, con_bf, pdata, threshold = list(deltapsi = 0.05, bf = 5, proportion = 0.5)) {
+    if (!"comp" %in% names(con_bf)) {
+        con_bf[, comp := paste(sample1, "vs", sample2, sep = "_")]
     }
+    n_sig <- foreach(i = 1:length(group_comps), .combine = list, .multicombine = TRUE) %do%
+    {           
+        group1 <- unlist(str_split(names(group_comps)[i], "_vs_"))[1]
+        group1_samples <- pdata[pdata[[grouping_var]] == group1,]$sample
+        group2 <- unlist(str_split(names(group_comps)[i], "_vs_"))[2]
+        group2_samples <- pdata[pdata[[grouping_var]] == group2,]$sample
+
+        n_comps <- con_bf %>%
+            select(sample1, sample2, comp) %>%
+            filter(comp %in% group_comps[[i]]) %>% 
+            distinct %>%
+            group_by(sample1) %>%
+            summarize(n_comps = n())
+        n_comp_name <- paste(names(group_comps)[i], "n_comps", sep = "_")
+        setnames(n_comps, c("sample1", n_comp_name))
+        
+        tmp_n_sig <- con_bf %>%
+            filter(sample1 %in% group1_samples & sample2 %in% group2_samples | sample2 %in% group1_samples & sample1 %in% group2_samples,
+                   comp %in% group_comps[[i]],
+                   abs(diff) >= threshold$deltapsi,
+                   bayes_factor >= threshold$bf) %>%
+            group_by_(main_grouping_var, "sample1") %>%            
+            summarize(n_sig = n())
+        n_sig_name <- paste(names(group_comps)[i], "n_sig", sep = "_")
+        setnames(tmp_n_sig, c(main_grouping_var, "sample1", n_sig_name))
+
+        tmp_n_sig <- left_join(n_comps, tmp_n_sig, by = "sample1")
+
+        filter_criteria <- interp(~x / y > threshold$proportion,
+                                  x = as.symbol(n_sig_name),
+                                  y = as.symbol(n_comp_name))
+        n_sig_res <- tmp_n_sig %>%
+            filter_(.dots = list(filter_criteria)) %>%
+            group_by_(main_grouping_var) %>%
+            summarize(n_sig = n())
+        setnames(n_sig_res, c(main_grouping_var, n_sig_name))
+    }
+    n_sig <- Reduce(function(...) merge(..., by = main_grouping_var, all = TRUE), n_sig)
     return(tbl_dt(n_sig))
 }

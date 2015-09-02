@@ -42,7 +42,7 @@ find.dm.events <- function(DT) {
 ##----------------------------------
 event_type <- "nonUTRevents.multi"
 
-allControls_res <- tbl_dt(fread(paste("~/Analysis_Projects/DMseq/results/allControls/allControls", event_type, "results.txt", sep = "_")))
+allControls_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/allControls/allControls", event_type, "results.txt", sep = "_")))
 
 quad_vs_tibialis <- allControls_res %>%
     select(gene_symbol, event_name, Quad_psi_mean, Quad_n, Tibialis_psi_mean, Tibialis_n, Quad_vs_Tibialis_n_sig, isoforms) %>%
@@ -51,14 +51,14 @@ quad_vs_tibialis <- allControls_res %>%
                    delta_psi > 0.05, Quad_vs_Tibialis_n_sig > 4) %>%
                        arrange(desc(Quad_vs_Tibialis_n_sig))
 
-tibialis_res <- tbl_dt(fread(paste("~/Analysis_Projects/DMseq/results/tibialis/tibialis", event_type, "results.txt", sep = "_")))
-tibialis_pdata <- tbl_dt(fread("~/Analysis_Projects/DMseq/data/tibialis/DM_tibialis_pdata.txt"))
+tibialis_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/tibialis/tibialis", event_type, "results.txt", sep = "_")))
+tibialis_pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_tibialis_pdata.txt"))
 
-quadricep_pdata <- tbl_dt(fread("~/Analysis_Projects/DMseq/data/quadricep/DM_quadricep_pdata.txt"))
-quadricep_res <- tbl_dt(fread(paste("~/Analysis_Projects/DMseq/results/quadricep/quadricep", event_type, "results.txt", sep = "_")))
+quadricep_pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_quadricep_pdata.txt"))
+quadricep_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/quadricep/quadricep", event_type, "results.txt", sep = "_")))
 
-heart_pdata <- tbl_dt(fread("~/Analysis_Projects/DMseq/data/heart/DM_heart_pdata.txt"))
-heart_res <- tbl_dt(fread(paste("~/Analysis_Projects/DMseq/results/heart/heart", event_type, "results.txt", sep = "_")))
+heart_pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_heart_pdata.txt"))
+heart_res <- tbl_dt(fread(paste("~/Projects/DMseq/results/heart/heart", event_type, "results.txt", sep = "_")))
 
 dm_heart <- find.dm.events(heart_res)
 dm_tibialis <- find.dm.events(tibialis_res)
@@ -70,18 +70,19 @@ gene_set <- intersect(quad_vs_tibialis$isoforms, dysregulated_events)
 ##----------------------------------
 ## load event data
 ##----------------------------------
-con_data <- tbl_dt(fread(paste("~/Analysis_Projects/DMseq/data/allSamples", event_type, "consolidatedSummaries.txt", sep = "_")))
-pdata <- tbl_dt(fread("~/Analysis_Projects/DMseq/data/DM_sample_pdata.txt"))
+con_data <- tbl_dt(fread(paste("~/Projects/DMseq/data/allSamples", event_type, "consolidatedSummaries.txt", sep = "_")))
+pdata <- tbl_dt(fread("~/Projects/DMseq/data/DM_sample_pdata.txt"))
 setnames(pdata, c("sample", "diagnosis", "tissue", "group", "read_length"))
 
 con_data <- left_join(con_data, select(pdata, sample, tissue, diagnosis), by = "sample")
 con_data <- con_data %>% filter(tissue %in% c("Tibialis", "Quad"))
 
 ## filter to keep 'high' confidence psi estimates
-f_con_data <- filter(con_data, ci_width < 0.33)
+f_con_data <- filter(con_data, ci_high - ci_low <= 0.33)
 
 ## define sets of all events quatified per tissue and find the intersection of these sets 
-tissues <- unique(pdata$tissue)
+tissues <- unique(f_con_data$tissue)
+
 events_by_tissue <- foreach(i = 1:length(tissues), .combine = list, .multicombine = TRUE) %do% {    
     tmp <- f_con_data %>% filter(tissue == tissues[i]) %>% select(isoforms)
     tmp$isoforms
@@ -90,5 +91,10 @@ names(events_by_tissue) <- tissues
 common_events <- Reduce(intersect, events_by_tissue)
 
 ## keep only those events quantified in all tissues
-common_data <- f_con_data %>% filter(isoforms %in% common_events)
-## common_data[, informativeCounts := sum.InformativeMisoCounts(common_data$counts)]
+common_data <- f_con_data %>% filter(isoforms %in% common_events) %>% select(miso_posterior_mean, tissue, isoforms) %>% as_data_frame
+
+common_data_spread <- tidyr::spread(common_data, key = tissue, value = miso_posterior_mean)
+
+ggplot(common_data_spread) +
+    geom_point(aes(x=Tibialis, y=Quad))
+
